@@ -1,0 +1,954 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ProxyEdu - Educational Proxy Simulator & Protocol Inspector</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        cyber: {
+                            bg: '#090d16',
+                            card: '#0f172a',
+                            border: '#1e293b',
+                            hover: '#334155',
+                            cyan: '#06b6d4',
+                            emerald: '#10b981',
+                            violet: '#8b5cf6',
+                            amber: '#f59e0b',
+                            rose: '#f43f5e'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Plus Jakarta Sans', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            background-color: #060911;
+            color: #cbd5e1;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            overflow-x: hidden;
+        }
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.75);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .glass-panel:hover {
+            border-color: rgba(255, 255, 255, 0.16);
+        }
+        .glow-cyan {
+            box-shadow: 0 0 25px rgba(6, 182, 212, 0.15);
+        }
+        .glow-emerald {
+            box-shadow: 0 0 25px rgba(16, 185, 129, 0.15);
+        }
+        /* Custom Scrollbars */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #060911;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #1e293b;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #334155;
+        }
+        /* Packet pulse animation */
+        @keyframes packetPulse {
+            0% { left: 0%; opacity: 0; }
+            30% { opacity: 1; }
+            70% { opacity: 1; }
+            100% { left: 92%; opacity: 0; }
+        }
+        .animate-packet {
+            animation: packetPulse 2.5s infinite linear;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between antialiased selection:bg-cyber-cyan selection:text-black">
+
+    <header class="border-b border-cyber-border bg-cyber-bg/90 sticky top-0 z-50 backdrop-blur-md">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <!-- Logo & Brand -->
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-cyber-cyan via-emerald-500 to-cyber-violet flex items-center justify-center text-black font-bold shadow-lg shadow-cyber-cyan/20">
+                    <i data-lucide="network" class="w-6 h-6 text-black"></i>
+                </div>
+                <div>
+                    <div class="flex items-center space-x-2">
+                        <span class="font-extrabold text-lg tracking-wide text-white">PROXY<span class="text-cyber-cyan">EDU</span></span>
+                        <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+                            CLASSROOM SUITE v2.4
+                        </span>
+                    </div>
+                    <p class="text-[11px] text-gray-400 font-mono">Interactive Web Proxy Simulator & Protocol Inspector</p>
+                </div>
+            </div>
+
+            <!-- Active Status Badges -->
+            <div class="hidden md:flex items-center space-x-6 text-xs font-mono border-l border-cyber-border pl-6">
+                <div class="flex items-center space-x-2">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                    <span class="text-gray-400">Client Real IP:</span>
+                    <span id="header-client-ip" class="text-gray-200 font-bold">198.51.100.42</span>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <i data-lucide="shield-check" class="w-4 h-4 text-cyber-cyan"></i>
+                    <span class="text-gray-400">Active Proxy Node:</span>
+                    <span id="header-proxy-node" class="text-cyber-cyan font-bold">US-East (198.51.200.88)</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-grow w-full space-y-6">
+        
+        <!-- Navigation Bar -->
+        <div class="flex flex-wrap items-center justify-between gap-3 border-b border-cyber-border pb-3">
+            <div class="flex flex-wrap gap-2">
+                <button onclick="switchTab('browser')" id="tab-btn-browser" class="nav-tab active flex items-center space-x-2 px-4 py-2 rounded-xl font-medium text-xs md:text-sm transition text-cyber-cyan bg-cyan-500/10 border border-cyan-500/20">
+                    <i data-lucide="globe" class="w-4 h-4"></i>
+                    <span>Proxy Browser & Inspector</span>
+                </button>
+                <button onclick="switchTab('visualizer')" id="tab-btn-visualizer" class="nav-tab flex items-center space-x-2 px-4 py-2 rounded-xl font-medium text-xs md:text-sm transition text-gray-400 hover:text-white hover:bg-cyber-card">
+                    <i data-lucide="activity" class="w-4 h-4"></i>
+                    <span>IP Masking & Flow</span>
+                </button>
+                <button onclick="switchTab('cache')" id="tab-btn-cache" class="nav-tab flex items-center space-x-2 px-4 py-2 rounded-xl font-medium text-xs md:text-sm transition text-gray-400 hover:text-white hover:bg-cyber-card">
+                    <i data-lucide="zap" class="w-4 h-4"></i>
+                    <span>Latency & Cache Simulator</span>
+                </button>
+                <button onclick="switchTab('ssl')" id="tab-btn-ssl" class="nav-tab flex items-center space-x-2 px-4 py-2 rounded-xl font-medium text-xs md:text-sm transition text-gray-400 hover:text-white hover:bg-cyber-card">
+                    <i data-lucide="lock" class="w-4 h-4"></i>
+                    <span>HTTPS SSL Termination</span>
+                </button>
+                <button onclick="switchTab('terminal')" id="tab-btn-terminal" class="nav-tab flex items-center space-x-2 px-4 py-2 rounded-xl font-medium text-xs md:text-sm transition text-gray-400 hover:text-white hover:bg-cyber-card">
+                    <i data-lucide="terminal" class="w-4 h-4"></i>
+                    <span>Network Terminal</span>
+                </button>
+            </div>
+
+            <!-- Global Presets Dropdown -->
+            <div class="flex items-center space-x-2 text-xs font-mono">
+                <span class="text-gray-400 hidden sm:inline">Preset Targets:</span>
+                <select id="preset-select" onchange="loadPresetSite(this.value)" class="bg-cyber-card border border-cyber-border text-white text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-cyber-cyan">
+                    <option value="wiki">Wikipedia Demo Page</option>
+                    <option value="echo">HTTP Request Echo Server</option>
+                    <option value="api">REST JSON Users API</option>
+                    <option value="html">Raw HTML Network Test</option>
+                    <option value="sec">Security Header Audit Page</option>
+                </select>
+            </div>
+        </div>
+
+        <div id="tab-browser" class="tab-content space-y-5">
+            
+            <!-- Address Bar & Proxy Settings Bar -->
+            <div class="glass-panel rounded-2xl p-4 border border-cyber-border space-y-3">
+                <div class="flex flex-col md:flex-row gap-3">
+                    
+                    <!-- Navigation Buttons -->
+                    <div class="flex items-center space-x-1.5">
+                        <button onclick="navigateHistory(-1)" title="Back" class="p-2.5 rounded-xl bg-cyber-bg border border-cyber-border hover:border-gray-500 text-gray-300 transition">
+                            <i data-lucide="arrow-left" class="w-4 h-4"></i>
+                        </button>
+                        <button onclick="navigateHistory(1)" title="Forward" class="p-2.5 rounded-xl bg-cyber-bg border border-cyber-border hover:border-gray-500 text-gray-300 transition">
+                            <i data-lucide="arrow-right" class="w-4 h-4"></i>
+                        </button>
+                        <button onclick="reloadProxy()" title="Reload" class="p-2.5 rounded-xl bg-cyber-bg border border-cyber-border hover:border-gray-500 text-gray-300 transition">
+                            <i data-lucide="rotate-cw" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+
+                    <!-- URL Bar Input -->
+                    <form onsubmit="handleUrlSubmit(event)" class="relative flex-grow flex items-center">
+                        <div class="absolute left-3.5 flex items-center space-x-2 text-gray-400 font-mono text-xs">
+                            <i data-lucide="lock" class="w-4 h-4 text-emerald-400"></i>
+                            <span class="text-gray-500 hidden sm:inline">proxy://</span>
+                        </div>
+                        <input type="text" id="url-input" value="https://en.wikipedia.org/wiki/Web_proxy" placeholder="Enter target URL or select preset..." class="w-full bg-cyber-bg border border-cyber-border rounded-xl pl-20 sm:pl-24 pr-10 py-2.5 text-xs md:text-sm text-white font-mono focus:outline-none focus:border-cyber-cyan focus:ring-1 focus:ring-cyber-cyan transition">
+                        <button type="submit" class="absolute right-2 px-3 py-1 rounded-lg bg-cyber-cyan text-black font-bold text-xs hover:opacity-90 transition">
+                            Go
+                        </button>
+                    </form>
+
+                    <!-- Proxy Selector Dropdown -->
+                    <div class="flex items-center space-x-2">
+                        <div class="relative w-full md:w-56">
+                            <select id="proxy-node-select" onchange="changeProxyNode(this.value)" class="w-full bg-cyber-bg border border-cyber-border text-cyber-cyan text-xs font-mono rounded-xl px-3 py-2.5 focus:outline-none focus:border-cyber-cyan">
+                                <option value="us-east">🇺🇸 US-East Node (198.51.200.88)</option>
+                                <option value="eu-west">🇪🇺 EU-West Node (185.199.108.153)</option>
+                                <option value="apac">🇯🇵 APAC Node (203.0.113.195)</option>
+                                <option value="direct">🚫 Direct (No Proxy Mode)</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quick Config Toggles -->
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-cyber-border/70 text-xs font-mono">
+                    <label class="flex items-center space-x-2 p-2 rounded-lg bg-cyber-bg/50 border border-cyber-border hover:border-gray-600 cursor-pointer">
+                        <input type="checkbox" id="cfg-inject-xff" onchange="updateProxyEngine()" checked class="rounded border-gray-700 text-cyber-cyan focus:ring-0">
+                        <span class="text-gray-300 text-[11px]">Inject X-Forwarded-For</span>
+                    </label>
+
+                    <label class="flex items-center space-x-2 p-2 rounded-lg bg-cyber-bg/50 border border-cyber-border hover:border-gray-600 cursor-pointer">
+                        <input type="checkbox" id="cfg-useragent" onchange="updateProxyEngine()" checked class="rounded border-gray-700 text-cyber-cyan focus:ring-0">
+                        <span class="text-gray-300 text-[11px]">Spoof User-Agent</span>
+                    </label>
+
+                    <label class="flex items-center space-x-2 p-2 rounded-lg bg-cyber-bg/50 border border-cyber-border hover:border-gray-600 cursor-pointer">
+                        <input type="checkbox" id="cfg-strip-headers" onchange="updateProxyEngine()" checked class="rounded border-gray-700 text-cyber-cyan focus:ring-0">
+                        <span class="text-gray-300 text-[11px]">Strip X-Frame-Options</span>
+                    </label>
+
+                    <label class="flex items-center space-x-2 p-2 rounded-lg bg-cyber-bg/50 border border-cyber-border hover:border-gray-600 cursor-pointer">
+                        <input type="checkbox" id="cfg-custom-headers" onchange="updateProxyEngine()" class="rounded border-gray-700 text-cyber-cyan focus:ring-0">
+                        <span class="text-gray-300 text-[11px]">Custom Student Headers</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Dual Pane: Left Browser Frame / Right HTTP Inspector -->
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+                
+                <!-- Left Column: Browser Viewport Panel -->
+                <div class="lg:col-span-7 glass-panel rounded-2xl border border-cyber-border flex flex-col h-[650px] overflow-hidden">
+                    <div class="bg-cyber-card px-4 py-2.5 border-b border-cyber-border flex items-center justify-between">
+                        <div class="flex items-center space-x-2">
+                            <div class="flex space-x-1.5">
+                                <span class="w-3 h-3 rounded-full bg-rose-500/80 inline-block"></span>
+                                <span class="w-3 h-3 rounded-full bg-amber-500/80 inline-block"></span>
+                                <span class="w-3 h-3 rounded-full bg-emerald-500/80 inline-block"></span>
+                            </div>
+                            <span class="text-xs font-mono text-gray-400 pl-2" id="viewport-title-label">Target Page Render View</span>
+                        </div>
+                        <div class="flex items-center space-x-2 text-[11px] font-mono">
+                            <span id="badge-status-code" class="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold">200 OK</span>
+                            <span id="badge-latency" class="px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">42ms</span>
+                        </div>
+                    </div>
+
+                    <!-- Simulated Frame Viewport -->
+                    <div class="relative flex-grow bg-white dark:bg-slate-950 overflow-auto" id="viewport-container">
+                        <iframe id="proxy-iframe" src="" class="w-full h-full border-0" sandbox="allow-scripts allow-same-origin allow-forms"></iframe>
+                    </div>
+                </div>
+
+                <!-- Right Column: Interactive Protocol & Header Inspector -->
+                <div class="lg:col-span-5 glass-panel rounded-2xl border border-cyber-border flex flex-col h-[650px] overflow-hidden">
+                    <div class="bg-cyber-card px-4 py-2.5 border-b border-cyber-border flex items-center justify-between">
+                        <div class="flex items-center space-x-2">
+                            <i data-lucide="layers" class="w-4 h-4 text-cyber-cyan"></i>
+                            <span class="text-xs font-mono font-bold text-white">Live Protocol Inspector</span>
+                        </div>
+                        <div class="flex space-x-1 font-mono text-[10px]">
+                            <button onclick="setInspectorMode('headers')" id="btn-inspect-headers" class="px-2 py-1 rounded bg-cyber-cyan/10 text-cyber-cyan border border-cyber-cyan/30">Headers</button>
+                            <button onclick="setInspectorMode('flow')" id="btn-inspect-flow" class="px-2 py-1 rounded text-gray-400 hover:text-white">Request Flow</button>
+                            <button onclick="setInspectorMode('custom')" id="btn-inspect-custom" class="px-2 py-1 rounded text-gray-400 hover:text-white">Custom Headers</button>
+                        </div>
+                    </div>
+
+                    <!-- Inspector Content Views -->
+                    <div id="inspector-body" class="p-4 space-y-4 overflow-y-auto flex-grow font-mono text-xs">
+                        
+                        <!-- Header Inspector Section -->
+                        <div id="view-inspector-headers" class="space-y-4">
+                            
+                            <!-- Rewritten Request URL -->
+                            <div class="p-3 rounded-xl bg-cyber-bg border border-cyber-border space-y-1">
+                                <span class="text-[10px] text-gray-400 uppercase tracking-wider block font-bold">Proxied Target URL</span>
+                                <div id="inspector-proxy-url" class="text-cyber-cyan break-all text-[11px]">
+                                    https://en.wikipedia.org/wiki/Web_proxy
+                                </div>
+                            </div>
+
+                            <!-- Client -> Proxy Request Headers -->
+                            <div class="space-y-1.5">
+                                <div class="flex items-center justify-between text-[10px] uppercase font-bold text-gray-400">
+                                    <span>1. Client Request Headers</span>
+                                    <span class="text-cyan-400">Browser -> Proxy</span>
+                                </div>
+                                <div id="headers-client-req" class="p-3 rounded-xl bg-black/70 border border-cyber-border space-y-1 text-[11px] leading-relaxed">
+                                    <!-- Rendered dynamically -->
+                                </div>
+                            </div>
+
+                            <!-- Proxy -> Target Modified Headers -->
+                            <div class="space-y-1.5">
+                                <div class="flex items-center justify-between text-[10px] uppercase font-bold text-emerald-400">
+                                    <span>2. Modified Proxy Request Headers</span>
+                                    <span>Proxy -> Target Web Server</span>
+                                </div>
+                                <div id="headers-proxy-req" class="p-3 rounded-xl bg-black/70 border border-emerald-500/30 space-y-1 text-[11px] leading-relaxed text-emerald-300">
+                                    <!-- Rendered dynamically -->
+                                </div>
+                            </div>
+
+                            <!-- Target -> Proxy Response Headers -->
+                            <div class="space-y-1.5">
+                                <div class="flex items-center justify-between text-[10px] uppercase font-bold text-violet-400">
+                                    <span>3. Target Server Response Headers</span>
+                                    <span>Target Server -> Proxy</span>
+                                </div>
+                                <div id="headers-target-resp" class="p-3 rounded-xl bg-black/70 border border-violet-500/30 space-y-1 text-[11px] leading-relaxed text-violet-300">
+                                    <!-- Rendered dynamically -->
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Request Flow Timeline View -->
+                        <div id="view-inspector-flow" class="hidden space-y-3">
+                            <div class="p-3 rounded-xl bg-cyber-bg border border-cyber-border space-y-2">
+                                <span class="text-xs font-bold text-white block">Request Hop Timeline</span>
+                                <div class="space-y-2 text-[11px]">
+                                    <div class="p-2 rounded-lg bg-cyber-card border border-cyber-border flex justify-between items-center">
+                                        <div>
+                                            <span class="text-cyan-400 font-bold block">1. DNS Lookup</span>
+                                            <span class="text-gray-400 text-[10px]">Resolved host to IP address</span>
+                                        </div>
+                                        <span class="text-gray-400">12ms</span>
+                                    </div>
+                                    <div class="p-2 rounded-lg bg-cyber-card border border-cyber-border flex justify-between items-center">
+                                        <div>
+                                            <span class="text-emerald-400 font-bold block">2. TCP Handshake</span>
+                                            <span class="text-gray-400 text-[10px]">SYN -> SYN-ACK -> ACK</span>
+                                        </div>
+                                        <span class="text-gray-400">18ms</span>
+                                    </div>
+                                    <div class="p-2 rounded-lg bg-cyber-card border border-cyber-border flex justify-between items-center">
+                                        <div>
+                                            <span class="text-amber-400 font-bold block">3. SSL/TLS Negotiation</span>
+                                            <span class="text-gray-400 text-[10px]">TLS 1.3 Key Exchange</span>
+                                        </div>
+                                        <span class="text-gray-400">22ms</span>
+                                    </div>
+                                    <div class="p-2 rounded-lg bg-cyber-card border border-cyber-border flex justify-between items-center">
+                                        <div>
+                                            <span class="text-violet-400 font-bold block">4. Content Forwarding</span>
+                                            <span class="text-gray-400 text-[10px]">Proxy received and returned 200 OK</span>
+                                        </div>
+                                        <span class="text-gray-400">14ms</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Custom Header Injector View -->
+                        <div id="view-inspector-custom" class="hidden space-y-4">
+                            <div>
+                                <h4 class="font-bold text-white text-xs">Inject Custom Student Headers</h4>
+                                <p class="text-[11px] text-gray-400">Test how proxies handle non-standard request headers</p>
+                            </div>
+
+                            <div class="space-y-2">
+                                <div>
+                                    <label class="text-[10px] text-gray-400 uppercase font-bold">Header Name:</label>
+                                    <input type="text" id="custom-header-name" value="X-Student-ID" class="w-full bg-cyber-bg border border-cyber-border rounded-lg p-2 text-white font-mono text-xs focus:outline-none focus:border-cyber-cyan">
+                                </div>
+                                <div>
+                                    <label class="text-[10px] text-gray-400 uppercase font-bold">Header Value:</label>
+                                    <input type="text" id="custom-header-val" value="CS101-USER-9941" class="w-full bg-cyber-bg border border-cyber-border rounded-lg p-2 text-white font-mono text-xs focus:outline-none focus:border-cyber-cyan">
+                                </div>
+                                <button onclick="applyCustomHeader()" class="w-full py-2 bg-gradient-to-r from-cyber-cyan to-emerald-500 text-black font-bold rounded-lg text-xs hover:opacity-90 transition">
+                                    Inject & Apply Header
+                                </button>
+                            </div>
+
+                            <div class="p-3 rounded-xl bg-cyber-bg border border-cyber-border space-y-1">
+                                <span class="text-[10px] text-gray-400 uppercase font-bold block">Active Injected Headers:</span>
+                                <div id="active-injected-headers-list" class="text-emerald-400 font-mono text-[11px]">
+                                    X-Student-ID: CS101-USER-9941
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="tab-visualizer" class="tab-content hidden space-y-6">
+            <div class="glass-panel p-6 rounded-2xl border border-cyber-border space-y-6">
+                <div>
+                    <h2 class="text-lg font-bold text-white">Anonymity & X-Forwarded-For IP Relay Visualizer</h2>
+                    <p class="text-xs text-gray-400">Understand how proxy servers relay requests while masking or appending origin client IP addresses</p>
+                </div>
+
+                <!-- Animated Interactive Flow Diagram -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 relative py-6">
+                    
+                    <!-- Animated Pulse Connection Line -->
+                    <div class="hidden md:block absolute top-1/2 left-12 right-12 h-0.5 bg-gradient-to-r from-cyber-cyan via-emerald-400 to-cyber-violet -translate-y-1/2 z-0"></div>
+
+                    <!-- Client Node Card -->
+                    <div class="glass-panel p-5 rounded-2xl border border-cyan-500/40 relative z-10 bg-cyber-card flex flex-col items-center text-center space-y-3">
+                        <div class="w-14 h-14 rounded-2xl bg-cyan-500/10 text-cyan-400 flex items-center justify-center border border-cyan-500/30">
+                            <i data-lucide="laptop" class="w-7 h-7"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-white text-sm">Student Laptop</h3>
+                            <p class="text-[11px] text-gray-400">Origin Client</p>
+                        </div>
+                        <div class="w-full bg-cyber-bg p-3 rounded-xl border border-cyber-border font-mono text-[11px] text-left space-y-1">
+                            <span class="text-gray-500 block">Real Client IP:</span>
+                            <span class="text-rose-400 font-bold">198.51.100.42</span>
+                        </div>
+                    </div>
+
+                    <!-- Proxy Node Card -->
+                    <div class="glass-panel p-5 rounded-2xl border border-emerald-500/50 relative z-10 bg-cyber-card flex flex-col items-center text-center space-y-3 glow-emerald">
+                        <div class="w-14 h-14 rounded-2xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center border border-emerald-500/30">
+                            <i data-lucide="server" class="w-7 h-7"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-white text-sm">Proxy Server Node</h3>
+                            <p class="text-[11px] text-gray-400">Middleman Gateway</p>
+                        </div>
+                        <div class="w-full bg-cyber-bg p-3 rounded-xl border border-cyber-border font-mono text-[11px] text-left space-y-1">
+                            <span class="text-gray-500 block">Proxy External IP:</span>
+                            <span id="vis-proxy-ip" class="text-cyber-cyan font-bold">198.51.200.88</span>
+                        </div>
+                    </div>
+
+                    <!-- Web Server Node Card -->
+                    <div class="glass-panel p-5 rounded-2xl border border-cyber-violet/40 relative z-10 bg-cyber-card flex flex-col items-center text-center space-y-3">
+                        <div class="w-14 h-14 rounded-2xl bg-cyber-violet/10 text-cyber-violet flex items-center justify-center border border-cyber-violet/30">
+                            <i data-lucide="globe-2" class="w-7 h-7"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-white text-sm">Target Web Server</h3>
+                            <p class="text-[11px] text-gray-400">Destination Website</p>
+                        </div>
+                        <div class="w-full bg-cyber-bg p-3 rounded-xl border border-cyber-border font-mono text-[11px] text-left space-y-1">
+                            <span class="text-gray-500 block">Destination IP Sees:</span>
+                            <span id="vis-server-sees-ip" class="text-emerald-400 font-bold">198.51.200.88</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Interactive Explanation Cards -->
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4 border-t border-cyber-border text-xs">
+                    <div class="p-4 rounded-xl bg-cyber-bg/60 border border-cyber-border space-y-2">
+                        <span class="text-cyber-cyan font-bold block">1. Transparent Proxy</span>
+                        <p class="text-gray-300 text-[11px]">Relays your request and includes <code class="text-white">X-Forwarded-For: 198.51.100.42</code>. The destination web server knows your real IP address.</p>
+                    </div>
+
+                    <div class="p-4 rounded-xl bg-cyber-bg/60 border border-cyber-border space-y-2">
+                        <span class="text-emerald-400 font-bold block">2. Anonymous Proxy</span>
+                        <p class="text-gray-300 text-[11px]">Identifies itself as a proxy server, but suppresses your real IP address. The web server sees only the proxy server's IP address.</p>
+                    </div>
+
+                    <div class="p-4 rounded-xl bg-cyber-bg/60 border border-cyber-border space-y-2">
+                        <span class="text-cyber-violet font-bold block">3. High Anonymity / Elite</span>
+                        <p class="text-gray-300 text-[11px]">Completely strips all proxy indicators (<code class="text-white">Via</code>, <code class="text-white">X-Forwarded-For</code>). Web servers cannot tell you are using a proxy.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="tab-cache" class="tab-content hidden space-y-6">
+            <div class="glass-panel p-6 rounded-2xl border border-cyber-border space-y-6">
+                <div>
+                    <h2 class="text-lg font-bold text-white">Proxy Caching & Network Delay Simulator</h2>
+                    <p class="text-xs text-gray-400">See how proxy servers store web responses locally to speed up subsequent requests and reduce bandwidth</p>
+                </div>
+
+                <!-- Interactive Controls -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    
+                    <div class="space-y-4 bg-cyber-card p-5 rounded-2xl border border-cyber-border">
+                        <h3 class="font-bold text-white text-sm">Simulation Settings</h3>
+                        
+                        <div class="space-y-2">
+                            <div class="flex justify-between text-xs">
+                                <label class="text-gray-300">Simulated Network Hop Delay:</label>
+                                <span id="delay-value-label" class="text-cyber-cyan font-mono font-bold">250 ms</span>
+                            </div>
+                            <input type="range" id="delay-slider" min="50" max="1000" step="50" value="250" oninput="updateSimDelay(this.value)" class="w-full accent-cyber-cyan">
+                        </div>
+
+                        <div class="flex items-center justify-between pt-2">
+                            <span class="text-xs text-gray-300">Enable Proxy Memory Cache:</span>
+                            <button id="toggle-cache-btn" onclick="toggleCacheEngine()" class="px-3 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs font-mono font-bold">
+                                CACHE ENABLED
+                            </button>
+                        </div>
+
+                        <button onclick="runCacheBenchmark()" class="w-full py-2.5 bg-gradient-to-r from-cyber-cyan to-emerald-500 text-black font-bold rounded-xl text-xs hover:opacity-90 transition flex items-center justify-center space-x-2">
+                            <i data-lucide="play" class="w-4 h-4"></i>
+                            <span>Test Fetch Request</span>
+                        </button>
+                    </div>
+
+                    <!-- Live Results Metrics Card -->
+                    <div class="space-y-4 bg-cyber-bg p-5 rounded-2xl border border-cyber-border font-mono text-xs">
+                        <h3 class="font-bold text-white text-sm font-sans">Benchmark Telemetry</h3>
+
+                        <div class="grid grid-cols-2 gap-3">
+                            <div class="p-3 rounded-xl bg-cyber-card border border-cyber-border">
+                                <span class="text-gray-400 text-[10px] block">CACHE STATUS</span>
+                                <span id="bench-cache-status" class="text-emerald-400 font-bold text-sm">HIT</span>
+                            </div>
+                            <div class="p-3 rounded-xl bg-cyber-card border border-cyber-border">
+                                <span class="text-gray-400 text-[10px] block">TOTAL LATENCY</span>
+                                <span id="bench-latency-val" class="text-cyber-cyan font-bold text-sm">4 ms</span>
+                            </div>
+                        </div>
+
+                        <div class="p-3 rounded-xl bg-black/60 border border-cyber-border space-y-1">
+                            <span class="text-gray-400 text-[10px] block">HTTP RESPONSE HEADER</span>
+                            <pre id="bench-header-out" class="text-emerald-300 text-[11px]">X-Cache: HIT from ProxyLab-US
+Age: 142 seconds
+X-Proxy-Response-Time: 4ms</pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="tab-ssl" class="tab-content hidden space-y-6">
+            <div class="glass-panel p-6 rounded-2xl border border-cyber-border space-y-6">
+                <div>
+                    <h2 class="text-lg font-bold text-white">HTTPS & SSL/TLS Termination Architecture</h2>
+                    <p class="text-xs text-gray-400">How Reverse Proxies decrypt client HTTPS traffic at the edge and forward it safely to internal servers</p>
+                </div>
+
+                <!-- Interactive Architecture Diagram -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 relative py-4">
+                    
+                    <div class="p-5 rounded-2xl bg-cyber-card border border-emerald-500/40 space-y-3 text-center">
+                        <div class="w-12 h-12 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center mx-auto">
+                            <i data-lucide="lock" class="w-6 h-6"></i>
+                        </div>
+                        <h3 class="font-bold text-white text-sm">1. Client &lt;-&gt; Proxy</h3>
+                        <p class="text-emerald-400 font-mono text-xs">Encrypted TLS 1.3</p>
+                        <p class="text-gray-400 text-[11px]">User browser connects to proxy over port 443 with a public SSL certificate.</p>
+                    </div>
+
+                    <div class="p-5 rounded-2xl bg-cyber-card border border-amber-500/40 space-y-3 text-center glow-cyan">
+                        <div class="w-12 h-12 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center mx-auto">
+                            <i data-lucide="key" class="w-6 h-6"></i>
+                        </div>
+                        <h3 class="font-bold text-white text-sm">2. SSL Termination</h3>
+                        <p class="text-amber-400 font-mono text-xs">Decryption at Edge</p>
+                        <p class="text-gray-400 text-[11px]">Proxy decrypts packet payload to inspect HTTP headers, filter malware, or apply web security rules.</p>
+                    </div>
+
+                    <div class="p-5 rounded-2xl bg-cyber-card border border-cyber-cyan/40 space-y-3 text-center">
+                        <div class="w-12 h-12 rounded-xl bg-cyan-500/10 text-cyan-400 flex items-center justify-center mx-auto">
+                            <i data-lucide="cpu" class="w-6 h-6"></i>
+                        </div>
+                        <h3 class="font-bold text-white text-sm">3. Proxy &lt;-&gt; Backend</h3>
+                        <p class="text-cyan-400 font-mono text-xs">Internal Network / mTLS</p>
+                        <p class="text-gray-400 text-[11px]">Proxy forwards request to internal web app backend over private LAN network.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="tab-terminal" class="tab-content hidden space-y-6">
+            <div class="glass-panel p-6 rounded-2xl border border-cyber-border space-y-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="text-lg font-bold text-white">Proxy Diagnostics Terminal</h2>
+                        <p class="text-xs text-gray-400">Type networking commands like <code class="text-cyber-cyan">ping</code>, <code class="text-cyber-cyan">curl</code>, <code class="text-cyber-cyan">dig</code>, <code class="text-cyber-cyan">headers</code>, or <code class="text-cyber-cyan">help</code></p>
+                    </div>
+                    <button onclick="clearTerminal()" class="px-3 py-1.5 rounded-lg bg-cyber-card border border-cyber-border text-gray-400 hover:text-white text-xs font-mono">Clear Console</button>
+                </div>
+
+                <div class="bg-black/90 p-4 rounded-xl border border-cyber-border font-mono text-xs h-80 overflow-y-auto flex flex-col justify-between" id="terminal-window">
+                    <div id="terminal-logs" class="space-y-1.5 text-emerald-400">
+                        <div>Welcome to ProxyEdu Network CLI v2.4</div>
+                        <div class="text-gray-500">Type 'help' to view available network diagnostic commands.</div>
+                    </div>
+
+                    <form onsubmit="handleTerminalSubmit(event)" class="flex items-center space-x-2 pt-3 border-t border-gray-800 mt-2">
+                        <span class="text-cyber-cyan font-bold">student@proxy-edu:~$</span>
+                        <input type="text" id="terminal-input" class="flex-grow bg-transparent text-white focus:outline-none font-mono text-xs" autofocus placeholder="Type command here...">
+                    </form>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <footer class="border-t border-cyber-border py-4 bg-cyber-bg text-center text-xs text-gray-500 font-mono">
+        ProxyEdu Educational Suite • Web Architecture & Networking Simulator
+    </footer>
+
+    <script>
+        // Preset Target Sites Configuration
+        const presetSites = {
+            wiki: {
+                url: 'https://en.wikipedia.org/wiki/Web_proxy',
+                title: 'Wikipedia Demo Page'
+            },
+            echo: {
+                url: 'https://httpbin.org/headers',
+                title: 'HTTP Request Echo Server'
+            },
+            api: {
+                url: 'https://jsonplaceholder.typicode.com/users',
+                title: 'REST JSON Users API'
+            },
+            html: {
+                url: 'https://example.com',
+                title: 'Raw HTML Network Test'
+            },
+            sec: {
+                url: 'https://httpbin.org/get',
+                title: 'Security Header Audit Page'
+            }
+        };
+
+        // Active State
+        let currentUrl = presetSites.wiki.url;
+        let activeProxyNode = 'us-east';
+        let customHeaders = { 'X-Student-ID': 'CS101-USER-9941' };
+        let historyStack = [currentUrl];
+        let historyIndex = 0;
+        let cacheEnabled = true;
+        let networkDelay = 250;
+
+        // Node IP Mapping
+        const nodeIps = {
+            'us-east': '198.51.200.88',
+            'eu-west': '185.199.108.153',
+            'apac': '203.0.113.195',
+            'direct': '198.51.100.42'
+        };
+
+        // Header Explanations Data Dictionary
+        const headerTooltips = {
+            'Host': 'Specifies the domain name of the target web server.',
+            'User-Agent': 'Identifies the browser type and operating system making the request.',
+            'X-Forwarded-For': 'Standard header injected by proxies containing the client origin IP address.',
+            'Via': 'Injected by proxy servers to track network hops.',
+            'X-Proxy-Node': 'Custom header indicating which proxy gateway processed the request.',
+            'Content-Type': 'Tells the browser what type of content is returned (HTML, JSON, CSS).',
+            'X-Student-ID': 'Custom injected header for classroom exercises.'
+        };
+
+        // DOM Loaded Init
+        document.addEventListener('DOMContentLoaded', () => {
+            lucide.createIcons();
+            loadProxyPage(currentUrl);
+        });
+
+        // Tab Switcher
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('.nav-tab').forEach(el => {
+                el.classList.remove('text-cyber-cyan', 'bg-cyan-500/10', 'border', 'border-cyan-500/20');
+                el.classList.add('text-gray-400');
+            });
+
+            const targetContent = document.getElementById(`tab-${tabName}`);
+            const targetBtn = document.getElementById(`tab-btn-${tabName}`);
+
+            if (targetContent) targetContent.classList.remove('hidden');
+            if (targetBtn) {
+                targetBtn.classList.remove('text-gray-400');
+                targetBtn.classList.add('text-cyber-cyan', 'bg-cyan-500/10', 'border', 'border-cyan-500/20');
+            }
+
+            // Re-initialize dynamic icons
+            lucide.createIcons();
+        }
+
+        // Handle URL Submit
+        function handleUrlSubmit(e) {
+            e.preventDefault();
+            let inputUrl = document.getElementById('url-input').value.trim();
+            if (!inputUrl) return;
+
+            if (!inputUrl.startsWith('http://') && !inputUrl.startsWith('https://')) {
+                inputUrl = 'https://' + inputUrl;
+            }
+
+            document.getElementById('url-input').value = inputUrl;
+            loadProxyPage(inputUrl);
+        }
+
+        function loadPresetSite(presetKey) {
+            if (presetSites[presetKey]) {
+                const url = presetSites[presetKey].url;
+                document.getElementById('url-input').value = url;
+                loadProxyPage(url);
+            }
+        }
+
+        // Load Proxy Page & Render
+        function loadProxyPage(url) {
+            currentUrl = url;
+            document.getElementById('proxy-iframe').src = url;
+            document.getElementById('inspector-proxy-url').innerText = url;
+
+            // Push to history
+            if (historyStack[historyIndex] !== url) {
+                historyStack = historyStack.slice(0, historyIndex + 1);
+                historyStack.push(url);
+                historyIndex = historyStack.length - 1;
+            }
+
+            renderInspectorHeaders();
+        }
+
+        function reloadProxy() {
+            loadProxyPage(currentUrl);
+        }
+
+        function navigateHistory(direction) {
+            const newIndex = historyIndex + direction;
+            if (newIndex >= 0 && newIndex < historyStack.length) {
+                historyIndex = newIndex;
+                const url = historyStack[historyIndex];
+                document.getElementById('url-input').value = url;
+                loadProxyPage(url);
+            }
+        }
+
+        function changeProxyNode(val) {
+            activeProxyNode = val;
+            const ip = nodeIps[val];
+            document.getElementById('header-proxy-node').innerText = `${val.toUpperCase()} (${ip})`;
+            document.getElementById('vis-proxy-ip').innerText = ip;
+            document.getElementById('vis-server-sees-ip').innerText = val === 'direct' ? '198.51.100.42' : ip;
+            renderInspectorHeaders();
+        }
+
+        function updateProxyEngine() {
+            renderInspectorHeaders();
+        }
+
+        // Helper function to format header lines with tooltips
+        function formatHeaders(headersObj) {
+            return Object.entries(headersObj)
+                .map(([key, val]) => {
+                    const tooltip = headerTooltips[key] ? `title="${headerTooltips[key]}"` : '';
+                    return `<span ${tooltip} class="cursor-help hover:underline"><span class="text-cyber-cyan">${key}</span>: ${val}</span>`;
+                })
+                .join('<br>');
+        }
+
+        // Render Inspector Headers
+        function renderInspectorHeaders() {
+            const clientIp = '198.51.100.42';
+            const proxyIp = nodeIps[activeProxyNode];
+            const domain = getDomain(currentUrl);
+
+            const cfgXff = document.getElementById('cfg-inject-xff').checked;
+            const cfgUa = document.getElementById('cfg-useragent').checked;
+            const cfgCustom = document.getElementById('cfg-custom-headers').checked;
+
+            // 1. Client Headers
+            const clientReqObj = {
+                'Host': domain,
+                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)',
+                'Accept': 'text/html,application/xhtml+xml'
+            };
+
+            // 2. Proxy Headers
+            const proxyReqObj = {
+                'Host': domain,
+                'User-Agent': cfgUa ? 'Mozilla/5.0 (ProxyEdu-Spoofed/2.4)' : 'Mozilla/5.0 (Macintosh)',
+                'Via': `1.1 ProxyEdu-${activeProxyNode.toUpperCase()}`,
+                'X-Proxy-Node': proxyIp
+            };
+
+            if (cfgXff && activeProxyNode !== 'direct') {
+                proxyReqObj['X-Forwarded-For'] = clientIp;
+            }
+
+            if (cfgCustom) {
+                Object.assign(proxyReqObj, customHeaders);
+            }
+
+            // 3. Target Response Headers
+            const targetRespObj = {
+                'Content-Type': 'text/html; charset=utf-8',
+                'Server': 'nginx/1.24.0',
+                'Cache-Control': 'max-age=3600',
+                'X-Proxy-Latency': '24ms'
+            };
+
+            document.getElementById('headers-client-req').innerHTML = `GET / HTTP/1.1<br>` + formatHeaders(clientReqObj);
+            document.getElementById('headers-proxy-req').innerHTML = `GET / HTTP/1.1<br>` + formatHeaders(proxyReqObj);
+            document.getElementById('headers-target-resp').innerHTML = `HTTP/2 200 OK<br>` + formatHeaders(targetRespObj);
+        }
+
+        function getDomain(url) {
+            try {
+                return new URL(url).hostname;
+            } catch (e) {
+                return 'example.com';
+            }
+        }
+
+        // Inspector Sub-Mode Switcher
+        function setInspectorMode(mode) {
+            document.getElementById('view-inspector-headers').classList.add('hidden');
+            document.getElementById('view-inspector-flow').classList.add('hidden');
+            document.getElementById('view-inspector-custom').classList.add('hidden');
+
+            document.getElementById('btn-inspect-headers').className = 'px-2 py-1 rounded text-gray-400 hover:text-white';
+            document.getElementById('btn-inspect-flow').className = 'px-2 py-1 rounded text-gray-400 hover:text-white';
+            document.getElementById('btn-inspect-custom').className = 'px-2 py-1 rounded text-gray-400 hover:text-white';
+
+            if (mode === 'headers') {
+                document.getElementById('view-inspector-headers').classList.remove('hidden');
+                document.getElementById('btn-inspect-headers').className = 'px-2 py-1 rounded bg-cyber-cyan/10 text-cyber-cyan border border-cyber-cyan/30';
+            } else if (mode === 'flow') {
+                document.getElementById('view-inspector-flow').classList.remove('hidden');
+                document.getElementById('btn-inspect-flow').className = 'px-2 py-1 rounded bg-cyber-cyan/10 text-cyber-cyan border border-cyber-cyan/30';
+            } else if (mode === 'custom') {
+                document.getElementById('view-inspector-custom').classList.remove('hidden');
+                document.getElementById('btn-inspect-custom').className = 'px-2 py-1 rounded bg-cyber-cyan/10 text-cyber-cyan border border-cyber-cyan/30';
+            }
+        }
+
+        // Custom Header Application
+        function applyCustomHeader() {
+            const name = document.getElementById('custom-header-name').value.trim();
+            const val = document.getElementById('custom-header-val').value.trim();
+
+            if (name && val) {
+                customHeaders[name] = val;
+                document.getElementById('active-injected-headers-list').innerText = `${name}: ${val}`;
+                document.getElementById('cfg-custom-headers').checked = true;
+                renderInspectorHeaders();
+            }
+        }
+
+        // Cache & Delay Controls
+        function updateSimDelay(val) {
+            networkDelay = parseInt(val);
+            document.getElementById('delay-value-label').innerText = `${networkDelay} ms`;
+        }
+
+        function toggleCacheEngine() {
+            cacheEnabled = !cacheEnabled;
+            const btn = document.getElementById('toggle-cache-btn');
+            if (cacheEnabled) {
+                btn.className = 'px-3 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs font-mono font-bold';
+                btn.innerText = 'CACHE ENABLED';
+            } else {
+                btn.className = 'px-3 py-1.5 rounded-lg bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs font-mono font-bold';
+                btn.innerText = 'CACHE DISABLED';
+            }
+        }
+
+        function runCacheBenchmark() {
+            const isHit = cacheEnabled;
+            const latency = isHit ? Math.floor(Math.random() * 5) + 2 : networkDelay;
+
+            document.getElementById('bench-cache-status').innerText = isHit ? 'HIT' : 'MISS';
+            document.getElementById('bench-cache-status').className = isHit ? 'text-emerald-400 font-bold text-sm' : 'text-rose-400 font-bold text-sm';
+
+            document.getElementById('bench-latency-val').innerText = `${latency} ms`;
+
+            document.getElementById('bench-header-out').innerText = `X-Cache: ${isHit ? 'HIT from ProxyEdu-US' : 'MISS from ProxyEdu-US'}
+Age: ${isHit ? '142 seconds' : '0 seconds'}
+X-Proxy-Response-Time: ${latency}ms`;
+        }
+
+        // Terminal Simulator
+        function handleTerminalSubmit(e) {
+            e.preventDefault();
+            const input = document.getElementById('terminal-input').value.trim();
+            if (!input) return;
+
+            appendTerminalLog(`student@proxy-edu:~$ ${input}`, 'text-white font-bold');
+            document.getElementById('terminal-input').value = '';
+
+            const parts = input.split(' ');
+            const cmd = parts[0].toLowerCase();
+
+            switch (cmd) {
+                case 'help':
+                    appendTerminalLog(`Available Commands:
+- ping <host>: Test latency to network target
+- dig <domain>: Perform DNS lookup
+- curl <url>: Output HTTP headers
+- nodes: List active proxy nodes
+- clear: Clear terminal screen`, 'text-cyan-300');
+                    break;
+
+                case 'ping':
+                    const host = parts[1] || 'wikipedia.org';
+                    appendTerminalLog(`PING ${host} (198.51.200.88): 56 data bytes
+64 bytes from 198.51.200.88: icmp_seq=0 ttl=58 time=18.4 ms
+64 bytes from 198.51.200.88: icmp_seq=1 ttl=58 time=19.1 ms
+--- ${host} ping statistics ---
+2 packets transmitted, 2 packets received, 0.0% packet loss`, 'text-emerald-300');
+                    break;
+
+                case 'dig':
+                    appendTerminalLog(`; <<>> DiG 9.10.6 <<>> wikipedia.org
+;; ANSWER SECTION:
+wikipedia.org.		300	IN	A	91.198.174.192
+;; SERVER: 1.1.1.1#53(1.1.1.1)`, 'text-violet-300');
+                    break;
+
+                case 'curl':
+                    appendTerminalLog(`HTTP/2 200 OK
+content-type: text/html; charset=utf-8
+server: nginx/1.24.0
+via: 1.1 ProxyEdu-US`, 'text-amber-300');
+                    break;
+
+                case 'nodes':
+                    appendTerminalLog(`Active Proxy Nodes:
+- US-East: 198.51.200.88 [ONLINE]
+- EU-West: 185.199.108.153 [ONLINE]
+- APAC: 203.0.113.195 [ONLINE]`, 'text-gray-300');
+                    break;
+
+                case 'clear':
+                    document.getElementById('terminal-logs').innerHTML = '';
+                    break;
+
+                default:
+                    appendTerminalLog(`Command not found: ${cmd}. Type 'help' for command list.`, 'text-rose-400');
+            }
+
+            const win = document.getElementById('terminal-window');
+            win.scrollTop = win.scrollHeight;
+        }
+
+        function appendTerminalLog(msg, colorClass) {
+            const logs = document.getElementById('terminal-logs');
+            const div = document.createElement('div');
+            div.className = colorClass;
+            div.innerText = msg;
+            logs.appendChild(div);
+        }
+
+        function clearTerminal() {
+            document.getElementById('terminal-logs').innerHTML = '';
+        }
+    </script>
+</body>
+</html>
